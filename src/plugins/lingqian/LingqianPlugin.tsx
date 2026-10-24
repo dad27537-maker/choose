@@ -3,14 +3,13 @@ import { BookOpen, Check, ChevronRight, CircleHelp, Clock3, Copy, Feather, Hand,
 import * as THREE from 'three'
 import type { Plugin, PluginComponentProps } from '../../types'
 import { readStorage, writeStorage } from '../../storage'
+import { LINGQIAN_HISTORY_KEY, type LingqianHistoryItem } from '../../activity'
 import { hexagrams, linesFor, trigramImages, type FortuneTempo, type FortuneTone, type Hexagram } from './hexagrams'
 import './lingqian.css'
 
-export const LINGQIAN_HISTORY_KEY = 'plugin-deck:lingqian-history'
 const HISTORY_CHANGE_EVENT = 'plugin-deck:history-change'
 
 type TopicId = 'general' | 'career' | 'relationship' | 'money' | 'study' | 'wellbeing'
-export type LingqianHistoryItem = { id: string; question: string; number: number; at: string }
 type HistoryChange = { type: 'delete'; id: string } | { type: 'clear' }
 
 const toneMeta: Record<FortuneTone, { label: string; direction: string }> = {
@@ -363,17 +362,19 @@ function FortuneTubeScene({ shaking, selectedNumber, canDraw, onDraw, onNeedQues
     renderer.domElement.addEventListener('pointerup', pointerUp)
     renderer.domElement.addEventListener('pointercancel', pointerUp)
 
-    const clock = new THREE.Clock()
+    const timer = new THREE.Timer()
+    timer.connect(document)
     let animationFrame = 0
     const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3)
     const smoothstep = (value: number) => {
       const clamped = THREE.MathUtils.clamp(value, 0, 1)
       return clamped * clamped * (3 - 2 * clamped)
     }
-    const render = () => {
+    const render = (timestamp?: number) => {
       animationFrame = window.requestAnimationFrame(render)
+      timer.update(timestamp)
       const now = performance.now()
-      const idleTime = clock.getElapsedTime()
+      const idleTime = timer.getElapsed()
 
       if (mode === 'shaking') {
         const duration = reducedMotion ? 420 : 1750
@@ -449,6 +450,7 @@ function FortuneTubeScene({ shaking, selectedNumber, canDraw, onDraw, onNeedQues
       renderer.domElement.removeEventListener('pointerup', pointerUp)
       renderer.domElement.removeEventListener('pointercancel', pointerUp)
       clearLabel()
+      timer.dispose()
       sealTexture.dispose()
       ;[outerGeometry, innerGeometry, bottomGeometry, mouthGeometry, rimGeometry, footGeometry, stickGeometry, tipGeometry, sealGeometry, shadowGeometry].forEach((geometry) => geometry.dispose())
       ;[outerMaterial, innerMaterial, goldMaterial, mouthMaterial, woodMaterial, tipMaterial, sealMaterial, shadowMaterial].forEach((material) => material.dispose())

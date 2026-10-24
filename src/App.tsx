@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Blocks, ChevronRight, Command, History, Home, Moon, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Trash2, X } from 'lucide-react'
 import { pluginRegistry } from './registry'
 import { readStorage, writeStorage } from './storage'
-import { LINGQIAN_HISTORY_KEY, type LingqianHistoryItem } from './plugins/lingqian/LingqianPlugin'
+import { D20_HISTORY_KEY, INTERACTIVE_D20_HISTORY_KEY, JIAOBEI_HISTORY_KEY, LINGQIAN_HISTORY_KEY, type D20HistoryItem, type InteractiveD20HistoryItem, type JiaobeiHistoryItem, type LingqianHistoryItem } from './activity'
 import './styles.css'
 
 type View = 'chat' | 'plugins' | 'history' | 'settings'
 type Theme = 'system' | 'light' | 'dark'
-type SavedRoll = { id: string; subject: string; value: number; at: string; verdict?: { label: string } }
-type RecentItem = { id: string; subject: string; meta: string; at: string; pluginId: string; source: 'd20' | 'lingqian' }
+type RecentItem = { id: string; subject: string; meta: string; at: string; pluginId: string; source: 'd20' | 'interactive-d20' | 'jiaobei' | 'lingqian' }
 
 const ENABLED_KEY = 'plugin-deck:enabled'
 const THEME_KEY = 'plugin-deck:theme'
-const HISTORY_KEY = 'plugin-deck:d20-history'
 const HISTORY_CHANGE_EVENT = 'plugin-deck:history-change'
 
 type HistoryChange = { type: 'delete'; id: string } | { type: 'clear' }
@@ -44,9 +42,11 @@ export default function App() {
   const activePlugins = useMemo(() => pluginRegistry.filter((plugin) => enabled.includes(plugin.id)), [enabled])
   const current = activePlugins.find((plugin) => plugin.id === activePluginId) ?? activePlugins[0]
   const recent = useMemo<RecentItem[]>(() => {
-    const dice = readStorage<SavedRoll[]>(HISTORY_KEY, []).map((roll) => ({ id: roll.id, subject: roll.subject, meta: `D20 · ${roll.value}`, at: roll.at, pluginId: 'dice.d20', source: 'd20' as const }))
+    const dice = readStorage<D20HistoryItem[]>(D20_HISTORY_KEY, []).map((roll) => ({ id: roll.id, subject: roll.subject, meta: `D20 · ${roll.value}`, at: roll.at, pluginId: 'dice.d20', source: 'd20' as const }))
+    const interactiveDice = readStorage<InteractiveD20HistoryItem[]>(INTERACTIVE_D20_HISTORY_KEY, []).map((roll) => ({ id: roll.id, subject: `亲手掷出 ${roll.value}`, meta: `互动 D20 · ${roll.label}`, at: roll.at, pluginId: 'dice.d20-interactive', source: 'interactive-d20' as const }))
+    const jiaobei = readStorage<JiaobeiHistoryItem[]>(JIAOBEI_HISTORY_KEY, []).map((item) => ({ id: item.id, subject: item.question, meta: `筊杯 · ${item.label}`, at: item.at, pluginId: 'divination.jiaobei', source: 'jiaobei' as const }))
     const lingqian = readStorage<LingqianHistoryItem[]>(LINGQIAN_HISTORY_KEY, []).map((item) => ({ id: item.id, subject: item.question, meta: `第${item.number}签 · ${String.fromCodePoint(0x4dc0 + item.number - 1)}`, at: item.at, pluginId: 'divination.lingqian', source: 'lingqian' as const }))
-    return [...dice, ...lingqian].sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
+    return [...dice, ...interactiveDice, ...jiaobei, ...lingqian].sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
   }, [activityTick])
   const filteredRecent = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase('zh-CN')
@@ -71,15 +71,21 @@ export default function App() {
     const target = recent.find((item) => item.id === rollId)
     if (target?.source === 'lingqian') {
       writeStorage(LINGQIAN_HISTORY_KEY, readStorage<LingqianHistoryItem[]>(LINGQIAN_HISTORY_KEY, []).filter((item) => item.id !== rollId))
+    } else if (target?.source === 'jiaobei') {
+      writeStorage(JIAOBEI_HISTORY_KEY, readStorage<JiaobeiHistoryItem[]>(JIAOBEI_HISTORY_KEY, []).filter((item) => item.id !== rollId))
+    } else if (target?.source === 'interactive-d20') {
+      writeStorage(INTERACTIVE_D20_HISTORY_KEY, readStorage<InteractiveD20HistoryItem[]>(INTERACTIVE_D20_HISTORY_KEY, []).filter((item) => item.id !== rollId))
     } else {
-      writeStorage(HISTORY_KEY, readStorage<SavedRoll[]>(HISTORY_KEY, []).filter((item) => item.id !== rollId))
+      writeStorage(D20_HISTORY_KEY, readStorage<D20HistoryItem[]>(D20_HISTORY_KEY, []).filter((item) => item.id !== rollId))
     }
     setActivityTick((tick) => tick + 1)
     notifyHistoryChange({ type: 'delete', id: rollId })
   }
   const clearRecent = () => {
     if (!window.confirm('确定清空最近会话吗？')) return
-    writeStorage(HISTORY_KEY, [])
+    writeStorage(D20_HISTORY_KEY, [])
+    writeStorage(INTERACTIVE_D20_HISTORY_KEY, [])
+    writeStorage(JIAOBEI_HISTORY_KEY, [])
     writeStorage(LINGQIAN_HISTORY_KEY, [])
     setActivityTick((tick) => tick + 1)
     notifyHistoryChange({ type: 'clear' })
@@ -120,7 +126,7 @@ export default function App() {
 
     <main className="app-main">
       <header className="topbar"><span className="mobile-brand-mark">✦</span><div className="topbar-title"><span className="topbar-kicker">{viewKicker}</span><strong>{viewTitle}</strong></div><div className="topbar-actions"><button className="topbar-icon" onClick={() => setView('plugins')} aria-label="打开工具中心"><Command size={17} /></button><span className="online-indicator"><span />本地运行</span><button className="mobile-new-session" onClick={newChat} aria-label="新会话"><Plus size={18} /></button></div></header>
-      <div className="page-content">{view === 'chat' && current ? <current.component key={current.id} onActivity={() => setActivityTick((tick) => tick + 1)} newSessionToken={newSessionToken} /> : view === 'plugins' ? <PluginCenter enabled={enabled} onToggle={togglePlugin} onOpen={openPlugin} /> : view === 'history' ? <HistoryPage items={filteredRecent} query={searchQuery} setQuery={setSearchQuery} searchRef={searchRef} onOpen={openPlugin} onDelete={deleteRecent} onClear={clearRecent} /> : <SettingsPage theme={theme} setTheme={setAppTheme} enabled={enabled} onToggle={togglePlugin} />}</div>
+      <div className="page-content">{view === 'chat' && current ? <Suspense fallback={<PluginLoading name={current.name} />}><current.component key={current.id} onActivity={() => setActivityTick((tick) => tick + 1)} newSessionToken={newSessionToken} /></Suspense> : view === 'plugins' ? <PluginCenter enabled={enabled} onToggle={togglePlugin} onOpen={openPlugin} /> : view === 'history' ? <HistoryPage items={filteredRecent} query={searchQuery} setQuery={setSearchQuery} searchRef={searchRef} onOpen={openPlugin} onDelete={deleteRecent} onClear={clearRecent} /> : <SettingsPage theme={theme} setTheme={setAppTheme} enabled={enabled} onToggle={togglePlugin} />}</div>
     </main>
     <nav className="mobile-tabbar" aria-label="主要导航"><MobileTab icon={<Home />} label="首页" active={view === 'chat'} onClick={() => setView('chat')} /><MobileTab icon={<Blocks />} label="工具" active={view === 'plugins'} onClick={() => setView('plugins')} /><MobileTab icon={<History />} label="记录" active={view === 'history'} onClick={() => setView('history')} /><MobileTab icon={<Settings />} label="设置" active={view === 'settings'} onClick={() => setView('settings')} /></nav>
   </div>
@@ -132,6 +138,10 @@ function NavItem({ icon, label, active, onClick }: { icon: ReactNode; label: str
 
 function MobileTab({ icon, label, active, onClick }: { icon: ReactNode; label: string; active: boolean; onClick: () => void }) {
   return <button className={active ? 'active' : ''} onClick={onClick}>{icon}<span>{label}</span></button>
+}
+
+function PluginLoading({ name }: { name: string }) {
+  return <div className="plugin-loading" role="status"><span className="brand-icon">✦</span><strong>正在打开{name}</strong><small>工具和本地资源正在准备中…</small></div>
 }
 
 function PluginCenter({ enabled, onToggle, onOpen }: { enabled: string[]; onToggle: (id: string) => void; onOpen: (id: string) => void }) {

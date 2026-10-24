@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2732" height="2732" viewBox="0 0 2732 2732">
+  <defs>
+    <linearGradient id="brand" x1="1030" y1="990" x2="1710" y2="1740" gradientUnits="userSpaceOnUse"><stop stop-color="#9688FF"/><stop offset="0.52" stop-color="#7566EF"/><stop offset="1" stop-color="#5342C5"/></linearGradient>
+    <filter id="shadow" x="850" y="850" width="1032" height="1072" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="34" stdDeviation="34" flood-color="#342788" flood-opacity="0.18"/></filter>
+  </defs>
+  <rect width="2732" height="2732" fill="#F8F8FB"/>
+  <g filter="url(#shadow)">
+    <rect x="1016" y="996" width="700" height="700" rx="218" fill="url(#brand)"/>
+    <path fill="#FFFFFF" d="M1366 1138c17 101 61 177 181 228-120 51-164 127-181 228-17-101-61-177-181-228 120-51 164-127 181-228Z"/>
+  </g>
+</svg>

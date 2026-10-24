@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dice5, MousePointer2, RotateCw, Sparkles, ZoomIn } from 'lucide-react'
 import type { Plugin, PluginComponentProps } from '../../types'
 import { readStorage, writeStorage } from '../../storage'
@@ -6,8 +6,13 @@ import { rollD20 } from '../d28/random'
 import { D20Scene } from '../d20/D20Scene'
 import { D20_SKIN_KEY, D20SkinPicker, isD20SkinId, type D20SkinId } from '../d20/skins'
 import { verdictFor } from '../d28/D28Plugin'
+import { INTERACTIVE_D20_HISTORY_KEY, type InteractiveD20HistoryItem } from '../../activity'
 
-export function InteractiveD20View({ onActivity }: PluginComponentProps) {
+function historyId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+export function InteractiveD20View({ onActivity, newSessionToken }: PluginComponentProps) {
   const [value, setValue] = useState(20)
   const [rolling, setRolling] = useState(false)
   const [rollingValue, setRollingValue] = useState<number>()
@@ -15,6 +20,13 @@ export function InteractiveD20View({ onActivity }: PluginComponentProps) {
     const stored = readStorage<string>(D20_SKIN_KEY, 'midnight')
     return isD20SkinId(stored) ? stored : 'midnight'
   })
+
+  useEffect(() => {
+    if (!newSessionToken) return
+    setValue(20)
+    setRollingValue(undefined)
+    setRolling(false)
+  }, [newSessionToken])
 
   const roll = () => {
     if (rolling) return
@@ -25,6 +37,8 @@ export function InteractiveD20View({ onActivity }: PluginComponentProps) {
       setValue(nextValue)
       setRollingValue(undefined)
       setRolling(false)
+      const item: InteractiveD20HistoryItem = { id: historyId(), value: nextValue, label: verdictFor(nextValue).label, at: new Date().toISOString() }
+      writeStorage(INTERACTIVE_D20_HISTORY_KEY, [item, ...readStorage<InteractiveD20HistoryItem[]>(INTERACTIVE_D20_HISTORY_KEY, [])].slice(0, 30))
       onActivity?.()
     }, 1250)
   }

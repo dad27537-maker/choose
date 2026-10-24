@@ -5,6 +5,7 @@ import { readStorage, writeStorage } from '../../storage'
 import { rollD20 } from './random'
 import { D20Scene } from '../d20/D20Scene'
 import { D20_SKIN_KEY, D20SkinPicker, isD20SkinId, type D20SkinId } from '../d20/skins'
+import { D20_HISTORY_KEY } from '../../activity'
 
 type Verdict = {
   label: string
@@ -24,7 +25,7 @@ type ChatItem =
   | { id: string; role: 'user'; text: string; rollId?: string }
   | { id: string; role: 'plugin'; text: string; roll?: D20Roll }
 
-const HISTORY_KEY = 'plugin-deck:d20-history'
+const HISTORY_KEY = D20_HISTORY_KEY
 const MESSAGES_KEY = 'plugin-deck:d20-messages'
 const HISTORY_CHANGE_EVENT = 'plugin-deck:history-change'
 

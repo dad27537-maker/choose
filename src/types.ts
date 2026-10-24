@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, LazyExoticComponent } from 'react'
 
 export type PluginComponentProps = {
   onNavigate?: (pluginId: string) => void
@@ -18,6 +18,6 @@ export type PluginManifest = {
 }
 
 export type Plugin = PluginManifest & {
-  component: ComponentType<PluginComponentProps>
+  component: ComponentType<PluginComponentProps> | LazyExoticComponent<ComponentType<PluginComponentProps>>
   accent: 'violet' | 'blue' | 'amber' | 'green'
 }

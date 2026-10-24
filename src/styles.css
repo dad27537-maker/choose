@@ -72,6 +72,11 @@
 .history-empty-state strong{font-size:15px;color:var(--text)}
 .history-empty-state p{max-width:310px;margin:7px 0 18px;font-size:11px;line-height:1.7}
 .theme-dark .manager-search,.theme-dark .history-search,.theme-dark .history-card{background:var(--surface);border-color:var(--line)}
+.plugin-loading{min-height:calc(100vh - 63px);display:grid;place-content:center;justify-items:center;gap:8px;color:#aaa7b4}
+.plugin-loading .brand-icon{margin-bottom:8px;animation:loading-pulse 1s ease-in-out infinite alternate}
+.plugin-loading strong{font-size:13px;color:var(--text)}
+.plugin-loading small{font-size:10px}
+@keyframes loading-pulse{to{transform:scale(1.08);box-shadow:0 10px 24px rgba(103,86,224,.32)}}
 
 @media(max-width:700px){
   html,body,#root{min-height:100%;background:var(--bg)}
@@ -135,4 +140,5 @@
   .history-card-copy>span{font-size:10px}
   .history-card-delete{width:44px}
   .history-empty-state{min-height:45vh}
+  .jiaobei-question textarea,.lingqian-question textarea,.almanac-date-input input{font-size:16px}
 }

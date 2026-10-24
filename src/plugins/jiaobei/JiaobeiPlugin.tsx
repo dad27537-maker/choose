@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { CircleHelp, Dice5, Info, RotateCw, Sparkles } from 'lucide-react'
 import * as THREE from 'three'
 import type { Plugin, PluginComponentProps } from '../../types'
+import { readStorage, writeStorage } from '../../storage'
+import { JIAOBEI_HISTORY_KEY, type JiaobeiHistoryItem, type JiaobeiOutcome } from '../../activity'
 import './jiaobei.css'
 
 type Face = 'yang' | 'yin'
-type OutcomeId = 'sheng' | 'xiao' | 'yin'
+type OutcomeId = JiaobeiOutcome
 type JiaobeiResult = { left: Face; right: Face; outcome: OutcomeId }
 
 const outcomes: Record<OutcomeId, { label: string; subtitle: string; detail: string; tone: string }> = {
@@ -25,6 +27,10 @@ function tossJiaobei(): JiaobeiResult {
   const right = randomFace()
   const outcome: OutcomeId = left !== right ? 'sheng' : left === 'yang' ? 'xiao' : 'yin'
   return { left, right, outcome }
+}
+
+function historyId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 /**
@@ -510,13 +516,23 @@ function JiaobeiPair({ rolling, result, throwRequest, canThrow, onManualThrow, o
   </div>
 }
 
-export function JiaobeiView(_: PluginComponentProps) {
+export function JiaobeiView({ onActivity, newSessionToken }: PluginComponentProps) {
   const [question, setQuestion] = useState('')
   const [asked, setAsked] = useState('')
   const [rolling, setRolling] = useState(false)
   const [result, setResult] = useState<JiaobeiResult>()
   const [throwRequest, setThrowRequest] = useState<ThrowRequest | null>(null)
   const [notice, setNotice] = useState('')
+
+  useEffect(() => {
+    if (!newSessionToken) return
+    setQuestion('')
+    setAsked('')
+    setResult(undefined)
+    setThrowRequest(null)
+    setRolling(false)
+    setNotice('')
+  }, [newSessionToken])
 
   const beginThrow = (_nextResult: JiaobeiResult, allowEmptyQuestion = false) => {
     const nextQuestion = question.trim()
@@ -543,7 +559,7 @@ export function JiaobeiView(_: PluginComponentProps) {
     <header className="conversation-header"><div className="conversation-title"><span className="app-avatar jiaobei-avatar">卜</span><div><strong>投掷筊杯</strong><span>民俗问事工具 · 本地运行</span></div></div><div className="header-actions"><span className="secure-pill"><span />离线可用</span><button className="quiet-button" onClick={toss} disabled={rolling || !question.trim()}><RotateCw size={15} />{rolling ? '投掷中' : '再投一次'}</button></div></header>
 
     <div className="jiaobei-layout"><main className="jiaobei-main-card"><div className="jiaobei-intro"><p className="eyebrow">JIAOBEI · DIVINATION</p><h1>把想问的事，<br /><em>交给一对筊杯。</em></h1><p>写下一个具体的问题，静下心来投掷。结果只作民俗参考，真正的答案仍然在你的选择里。</p></div><div className="jiaobei-question"><label htmlFor="jiaobei-question-input">你想询问什么？</label><textarea id="jiaobei-question-input" value={question} onChange={(event) => { setQuestion(event.target.value); setNotice('') }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); toss() } }} placeholder="例如：这周适合开始新的计划吗？" rows={3} /><div className="jiaobei-question-footer"><span>Enter 投掷 · Shift + Enter 换行</span><button className="jiaobei-toss-button" onClick={toss} disabled={rolling || !question.trim()}><Dice5 size={18} />{rolling ? '筊杯翻滚中…' : '投掷筊杯'}</button></div>{notice && <p className="jiaobei-notice" role="alert">{notice}</p>}</div></main>
-      <aside className="jiaobei-result-card"><div className="jiaobei-result-heading"><div><p className="eyebrow">TOSS RESULT</p><h2>{rolling ? '正在投掷…' : outcome?.label ?? '等待投掷'}</h2></div><Sparkles size={18} /></div><JiaobeiPair rolling={rolling} result={result} throwRequest={throwRequest} canThrow={!rolling} onManualThrow={(nextResult) => beginThrow(nextResult, true)} onNeedQuestion={() => setNotice('先结束当前投掷，再拖动筊杯。')} onSettled={(nextResult) => { setResult(nextResult); setRolling(false) }} />{outcome ? <div className={`jiaobei-result-copy tone-${outcome.tone}`}><span className="jiaobei-result-subtitle">{outcome.subtitle}</span><strong>{outcome.label}</strong><p>{outcome.detail}</p><div className="jiaobei-asked"><CircleHelp size={14} /><span>{asked}</span></div></div> : <div className="jiaobei-empty"><Info size={20} /><p>先写下问题，再点击投掷，或直接拖住筊杯后松手抛出。</p><span>一阴一阳为圣杯<br />两面皆阳为笑杯<br />两面皆阴为阴杯</span></div>}<div className="jiaobei-disclaimer">筊杯结果为传统民俗文化体验，仅供参考，不替代现实中的判断与专业意见。</div></aside>
+      <aside className="jiaobei-result-card"><div className="jiaobei-result-heading"><div><p className="eyebrow">TOSS RESULT</p><h2>{rolling ? '正在投掷…' : outcome?.label ?? '等待投掷'}</h2></div><Sparkles size={18} /></div><JiaobeiPair rolling={rolling} result={result} throwRequest={throwRequest} canThrow={!rolling} onManualThrow={(nextResult) => beginThrow(nextResult, true)} onNeedQuestion={() => setNotice('先结束当前投掷，再拖动筊杯。')} onSettled={(nextResult) => { const resultCopy = outcomes[nextResult.outcome]; const item: JiaobeiHistoryItem = { id: historyId(), question: asked || question.trim() || '手动互动演示', outcome: nextResult.outcome, label: resultCopy.label, at: new Date().toISOString() }; setResult(nextResult); setRolling(false); writeStorage(JIAOBEI_HISTORY_KEY, [item, ...readStorage<JiaobeiHistoryItem[]>(JIAOBEI_HISTORY_KEY, [])].slice(0, 30)); onActivity?.() }} />{outcome ? <div className={`jiaobei-result-copy tone-${outcome.tone}`}><span className="jiaobei-result-subtitle">{outcome.subtitle}</span><strong>{outcome.label}</strong><p>{outcome.detail}</p><div className="jiaobei-asked"><CircleHelp size={14} /><span>{asked}</span></div></div> : <div className="jiaobei-empty"><Info size={20} /><p>先写下问题，再点击投掷，或直接拖住筊杯后松手抛出。</p><span>一阴一阳为圣杯<br />两面皆阳为笑杯<br />两面皆阴为阴杯</span></div>}<div className="jiaobei-disclaimer">筊杯结果为传统民俗文化体验，仅供参考，不替代现实中的判断与专业意见。</div></aside>
     </div>
   </section>
 }

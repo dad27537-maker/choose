@@ -108,8 +108,8 @@ public sealed class PluginStateStore
     public HashSet<string> LoadEnabled(IEnumerable<DiscoveredPlugin> plugins)
     {
         var defaults = plugins.Where(plugin => plugin.Manifest?.DefaultEnabled == true).Select(plugin => plugin.Id);
-        var saved = storage.Load(EnabledKey, Array.Empty<string>());
-        var ids = saved.Length == 0 ? defaults : saved;
+        var saved = storage.Load<string[]?>(EnabledKey, null);
+        var ids = saved is null ? defaults : saved;
         var knownIds = plugins.Select(plugin => plugin.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         return ids.Where(knownIds.Contains).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }

@@ -24,7 +24,7 @@ public static class D20Rules
 {
     public static int Roll() => RandomNumberGenerator.GetInt32(1, 21);
 
-    public static RollResult RollResult() => RollResult.FromValue(Roll());
+    public static RollResult RollResult() => global::WorkRoll.Core.RollResult.FromValue(Roll());
 
     public static bool IsValidValue(int value) => value is >= 1 and <= 20;
 }
